@@ -1,20 +1,40 @@
 import requests
 from requests.auth import HTTPBasicAuth
 import json
+import argparse
+import getpass
+
+
+parser = argparse.ArgumentParser(description='This program will change the role of a user in Ranger.')
+parser.add_argument('-d','--domain',help='Ranger domain', required=True)
+parser.add_argument('-p','--port',help='Ranger port', required=True)
+parser.add_argument('-g','--gateway',help='Knox gateway to Ranger', required=False)
+parser.add_argument('-u','--admin_user',help='Admin username', required=True)
+args = parser.parse_args()
+USERNAME = args.admin_user
+PASSWORD = getpass.getpass()
+
 
 # username input
 name = raw_input('What username\'s role would you like to change?')
 
 # user get url
-url = "http://groot3.openstacklocal:6080/service/xusers/users/"
+if args.gateway == None:
+    ranger_url = args.domain  + ":" +  args.port
+else:
+    ranger_url = args.domain  + ":" +  args.port + args.gateway
+
+
 headers = {'Content-Type': 'application/json', 'Accept': 'application/json',
            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36',
            'X-XSRF-HEADER': 'valid'}
 payload = {'name': name}
 
+ranger_rest_api = "/service/xusers/users"
+url = ranger_url + ranger_rest_api
 # get request with Admin username and password
 myResponse = requests.get(url, headers=headers, params=payload,
-                          auth=HTTPBasicAuth(raw_input("username: "), raw_input("Password: ")), verify=True)
+                          auth=HTTPBasicAuth(USERNAME, PASSWORD), verify=True)
 
 # debug
 # print (myResponse.status_code)
@@ -45,10 +65,14 @@ if (myResponse.ok):
             idconfirmed = raw_input("Is " + str(idconfirm) + " correct y/n ?")
             if "y" in idconfirmed:
                 print "y"
-                idurl = ("http://groot3.openstacklocal:6080/service/xusers/users/" + str(idconfirm))
-                getResponse = requests.get(idurl, headers=headers, auth=HTTPBasicAuth("admin", "admin"), verify=True)
+                ranger_rest_api = "/service/xusers/users/"
+                url = ranger_url + ranger_rest_api
+                idurl = (url + str(idconfirm))
+                getResponse = requests.get(idurl, headers=headers, auth=HTTPBasicAuth(USERNAME, PASSWORD), verify=True)
                 if (getResponse.ok):
-                    geturl = ("http://groot3.openstacklocal:6080/service/xusers/secure/users/" + str(idconfirm))
+                    ranger_secure_api = "/service/xusers/secure/users"
+                    url = ranger_url + ranger_secure_api
+                    geturl = (url + str(idconfirm))
                     # global userresponse
                     print getResponse.headers
                     print getResponse.content
@@ -61,7 +85,7 @@ if (myResponse.ok):
                             print(userResponse)
                             print("jsondump of altered response")
                             print (json.dumps(userResponse))
-                            myPutResponse = requests.put(geturl, headers=headers, auth=HTTPBasicAuth("admin", "admin"),
+                            myPutResponse = requests.put(geturl, headers=headers, auth=HTTPBasicAuth(USERNAME, PASSWORD),
                                                          verify=True,
                                                          data=json.dumps(userResponse))
                             print(response)
@@ -78,7 +102,7 @@ if (myResponse.ok):
                             userResponse["userRoleList"][0] = "ROLE_SYS_ADMIN"
                             del userResponse["password"]
 
-                            myPutResponse = requests.put(geturl, headers=headers, auth=HTTPBasicAuth("admin", "admin"),
+                            myPutResponse = requests.put(geturl, headers=headers, auth=HTTPBasicAuth(USERNAME, PASSWORD),
                                                          verify=True, data=json.dumps(userResponse))
                             print(response)
                             print(myPutResponse.status_code)
